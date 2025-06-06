@@ -1,12 +1,12 @@
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { useState } from "react";
+import { Toaster } from "sonner";
 import { api } from "../convex/_generated/api";
+import { Id } from "../convex/_generated/dataModel";
+import { GroupDetails } from "./components/GroupDetails";
+import { GroupList } from "./components/GroupList";
 import { SignInForm } from "./SignInForm";
 import { SignOutButton } from "./SignOutButton";
-import { Toaster } from "sonner";
-import { GroupList } from "./components/GroupList";
-import { GroupDetails } from "./components/GroupDetails";
-import { useState } from "react";
-import { Id } from "../convex/_generated/dataModel";
 
 export default function App() {
   const [selectedGroupId, setSelectedGroupId] = useState<Id<"groups"> | null>(null);
@@ -29,7 +29,7 @@ export default function App() {
       </header>
       <main className="flex-1 p-8">
         <div className="max-w-6xl mx-auto">
-          <Content 
+          <Content
             selectedGroupId={selectedGroupId}
             setSelectedGroupId={setSelectedGroupId}
           />
@@ -40,10 +40,10 @@ export default function App() {
   );
 }
 
-function Content({ 
-  selectedGroupId, 
-  setSelectedGroupId 
-}: { 
+function Content({
+  selectedGroupId,
+  setSelectedGroupId
+}: {
   selectedGroupId: Id<"groups"> | null;
   setSelectedGroupId: (id: Id<"groups"> | null) => void;
 }) {

@@ -1,6 +1,6 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const getGroupBalances = query({
   args: {
@@ -15,7 +15,7 @@ export const getGroupBalances = query({
     // Check if user is a member
     const membership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userId)
       )
       .unique();
@@ -43,7 +43,7 @@ export const getGroupBalances = query({
           .query("expenseSplits")
           .withIndex("by_expense", (q) => q.eq("expenseId", expense._id))
           .collect();
-        
+
         // If no splits exist (legacy expense), create equal splits
         if (splits.length === 0) {
           const splitAmount = expense.amount / memberships.length;
@@ -56,7 +56,7 @@ export const getGroupBalances = query({
             _creationTime: expense.date,
           }));
         }
-        
+
         return splits.map(split => ({ ...split, expenseId: expense._id, paidBy: expense.paidBy }));
       })
     );
@@ -103,7 +103,7 @@ export const getGroupBalances = query({
     for (const payment of payments) {
       const fromBalance = balances.get(payment.fromUserId);
       const toBalance = balances.get(payment.toUserId);
-      
+
       if (fromBalance) {
         fromBalance.totalPaid += payment.amount;
       }
@@ -134,7 +134,7 @@ export const getSettlementSuggestions = query({
     // Check if user is a member
     const membership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userId)
       )
       .unique();
@@ -160,7 +160,7 @@ export const getSettlementSuggestions = query({
           .query("expenseSplits")
           .withIndex("by_expense", (q) => q.eq("expenseId", expense._id))
           .collect();
-        
+
         // If no splits exist (legacy expense), create equal splits
         if (splits.length === 0) {
           const splitAmount = expense.amount / memberships.length;
@@ -173,7 +173,7 @@ export const getSettlementSuggestions = query({
             _creationTime: expense.date,
           }));
         }
-        
+
         return splits.map(split => ({ ...split, expenseId: expense._id, paidBy: expense.paidBy }));
       })
     );
@@ -214,7 +214,7 @@ export const getSettlementSuggestions = query({
     for (const payment of payments) {
       const fromBalance = balances.get(payment.fromUserId);
       const toBalance = balances.get(payment.toUserId);
-      
+
       if (fromBalance) {
         fromBalance.totalPaid += payment.amount;
       }
@@ -228,21 +228,21 @@ export const getSettlementSuggestions = query({
     }
 
     const balanceArray = Array.from(balances.values());
-    
+
     // Separate creditors and debtors
     const creditors = balanceArray.filter(b => b.netBalance > 0.01).sort((a, b) => b.netBalance - a.netBalance);
     const debtors = balanceArray.filter(b => b.netBalance < -0.01).sort((a, b) => a.netBalance - b.netBalance);
-    
+
     const suggestions = [];
     let creditorIndex = 0;
     let debtorIndex = 0;
-    
+
     while (creditorIndex < creditors.length && debtorIndex < debtors.length) {
       const creditor = { ...creditors[creditorIndex] };
       const debtor = { ...debtors[debtorIndex] };
-      
+
       const amount = Math.min(creditor.netBalance, Math.abs(debtor.netBalance));
-      
+
       if (amount > 0.01) {
         suggestions.push({
           from: debtor.user,
@@ -250,14 +250,14 @@ export const getSettlementSuggestions = query({
           amount: amount,
         });
       }
-      
+
       creditor.netBalance -= amount;
       debtor.netBalance += amount;
-      
+
       if (creditor.netBalance < 0.01) creditorIndex++;
       if (debtor.netBalance > -0.01) debtorIndex++;
     }
-    
+
     return suggestions;
   },
 });

@@ -1,6 +1,6 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const recordPayment = mutation({
   args: {
@@ -22,14 +22,14 @@ export const recordPayment = mutation({
     // Check if both users are members of the group
     const fromMembership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userId)
       )
       .unique();
 
     const toMembership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", args.toUserId)
       )
       .unique();

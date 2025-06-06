@@ -1,6 +1,6 @@
+import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
 
 const applicationTables = {
   groups: defineTable({
@@ -24,7 +24,7 @@ const applicationTables = {
     amount: v.number(),
     paidBy: v.id("users"),
     date: v.number(),
-    splitType: v.optional(v.union(v.literal("equal"), v.literal("custom"))),
+    splitType: v.optional(v.union(v.literal("equal"), v.literal("amount"), v.literal("percentage"))),
   })
     .index("by_group", ["groupId"]),
 
@@ -32,6 +32,7 @@ const applicationTables = {
     expenseId: v.id("expenses"),
     userId: v.id("users"),
     amount: v.number(),
+    percentage: v.optional(v.number()),
   })
     .index("by_expense", ["expenseId"])
     .index("by_user", ["userId"]),

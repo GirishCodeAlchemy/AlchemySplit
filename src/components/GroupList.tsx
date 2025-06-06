@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { toast } from "sonner";
 
 interface GroupListProps {
   onSelectGroup: (groupId: Id<"groups">) => void;
@@ -52,7 +52,7 @@ export function GroupList({ onSelectGroup }: GroupListProps) {
     }
   };
 
-  const availableGroups = allGroups?.filter(group => 
+  const availableGroups = allGroups?.filter(group =>
     !userGroups?.some(userGroup => userGroup?._id === group._id)
   ) || [];
 

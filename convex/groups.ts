@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 
 export const createGroup = mutation({
   args: {
@@ -30,6 +30,107 @@ export const createGroup = mutation({
   },
 });
 
+export const searchUsers = query({
+  args: {
+    searchTerm: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    if (!args.searchTerm.trim() || args.searchTerm.length < 2) {
+      return [];
+    }
+
+    const searchTerm = args.searchTerm.toLowerCase().trim();
+
+    // Get all users and filter them
+    const allUsers = await ctx.db.query("users").collect();
+
+    const matchingUsers = allUsers.filter(user => {
+      if (!user) return false;
+
+      // Search by email
+      if (user.email && user.email.toLowerCase().includes(searchTerm)) {
+        return true;
+      }
+
+      // Search by name
+      if (user.name && user.name.toLowerCase().includes(searchTerm)) {
+        return true;
+      }
+
+      // Search by phone (if exists)
+      if (user.phone && user.phone.includes(searchTerm)) {
+        return true;
+      }
+
+      return false;
+    });
+
+    // Limit results to prevent overwhelming UI
+    return matchingUsers.slice(0, 10).map(user => ({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    }));
+  },
+});
+
+export const addMemberBySearch = mutation({
+  args: {
+    groupId: v.id("groups"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const currentUserId = await getAuthUserId(ctx);
+    if (!currentUserId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Check if current user is a member of the group
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_and_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", currentUserId)
+      )
+      .unique();
+
+    if (!membership) {
+      throw new Error("Not a member of this group");
+    }
+
+    // Check if the user exists
+    const userToAdd = await ctx.db.get(args.userId);
+    if (!userToAdd) {
+      throw new Error("User not found");
+    }
+
+    // Check if user is already a member
+    const existingMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_and_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", args.userId)
+      )
+      .unique();
+
+    if (existingMembership) {
+      throw new Error("User is already a member of this group");
+    }
+
+    await ctx.db.insert("memberships", {
+      groupId: args.groupId,
+      userId: args.userId,
+      joinedAt: Date.now(),
+    });
+
+    return args.userId;
+  },
+});
+
 export const addMemberByEmail = mutation({
   args: {
     groupId: v.id("groups"),
@@ -44,7 +145,7 @@ export const addMemberByEmail = mutation({
     // Check if current user is a member of the group
     const membership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userId)
       )
       .unique();
@@ -56,17 +157,127 @@ export const addMemberByEmail = mutation({
     // Find user by email
     const userToAdd = await ctx.db
       .query("users")
-      .withIndex("email", (q) => q.eq("email", args.email))
+      .withIndex("email", (q) => q.eq("email", args.email.toLowerCase().trim()))
       .unique();
 
     if (!userToAdd) {
-      throw new Error("User with this email not found");
+      throw new Error("User with this email not found. They may need to sign up first.");
     }
 
     // Check if user is already a member
     const existingMembership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", userToAdd._id)
+      )
+      .unique();
+
+    if (existingMembership) {
+      throw new Error("User is already a member of this group");
+    }
+
+    await ctx.db.insert("memberships", {
+      groupId: args.groupId,
+      userId: userToAdd._id,
+      joinedAt: Date.now(),
+    });
+
+    return userToAdd._id;
+  },
+});
+
+export const addMemberByPhone = mutation({
+  args: {
+    groupId: v.id("groups"),
+    phone: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Check if current user is a member of the group
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_and_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!membership) {
+      throw new Error("Not a member of this group");
+    }
+
+    // Find user by phone
+    const userToAdd = await ctx.db
+      .query("users")
+      .withIndex("phone", (q) => q.eq("phone", args.phone.trim()))
+      .unique();
+
+    if (!userToAdd) {
+      throw new Error("User with this phone number not found. They may need to sign up first.");
+    }
+
+    // Check if user is already a member
+    const existingMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_and_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", userToAdd._id)
+      )
+      .unique();
+
+    if (existingMembership) {
+      throw new Error("User is already a member of this group");
+    }
+
+    await ctx.db.insert("memberships", {
+      groupId: args.groupId,
+      userId: userToAdd._id,
+      joinedAt: Date.now(),
+    });
+
+    return userToAdd._id;
+  },
+});
+
+export const addMemberByName = mutation({
+  args: {
+    groupId: v.id("groups"),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Check if current user is a member of the group
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_and_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", userId)
+      )
+      .unique();
+
+    if (!membership) {
+      throw new Error("Not a member of this group");
+    }
+
+    // Find user by name (case insensitive)
+    const allUsers = await ctx.db.query("users").collect();
+    const userToAdd = allUsers.find(user =>
+      user.name && user.name.toLowerCase().trim() === args.name.toLowerCase().trim()
+    );
+
+    if (!userToAdd) {
+      throw new Error("User with this name not found. Try searching by email instead.");
+    }
+
+    // Check if user is already a member
+    const existingMembership = await ctx.db
+      .query("memberships")
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userToAdd._id)
       )
       .unique();
@@ -98,7 +309,7 @@ export const joinGroup = mutation({
     // Check if user is already a member
     const existingMembership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userId)
       )
       .unique();
@@ -152,7 +363,7 @@ export const getGroupDetails = query({
     // Check if user is a member
     const membership = await ctx.db
       .query("memberships")
-      .withIndex("by_group_and_user", (q) => 
+      .withIndex("by_group_and_user", (q) =>
         q.eq("groupId", args.groupId).eq("userId", userId)
       )
       .unique();
@@ -192,7 +403,7 @@ export const getGroupDetails = query({
     const expensesWithUsers = await Promise.all(
       expenses.map(async (expense) => {
         const paidByUser = await ctx.db.get(expense.paidBy);
-        
+
         // Get splits for this expense
         const splits = await ctx.db
           .query("expenseSplits")
@@ -238,7 +449,7 @@ export const getGroupDetails = query({
 
     return {
       group,
-      members,
+      members: members.filter(Boolean), // Filter out any null users
       expenses: expensesWithUsers,
       payments: paymentsWithUsers,
     };
